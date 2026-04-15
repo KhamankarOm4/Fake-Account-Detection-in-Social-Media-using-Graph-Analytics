@@ -12,78 +12,112 @@ import os
 logger = logging.getLogger(__name__)
 
 
+from pyspark.sql import SparkSession
+from pyspark.sql.types import StructType, StructField, IntegerType
+
 def load_edgelist(
     filepath: str,
+    engine: str = "pandas",
     chunksize: int = 100_000,
     max_rows: int = None,
     sep: str = " ",
 ) -> pd.DataFrame:
     """
-    Load an edge-list file (source, target) in memory-efficient chunks.
-
+    Load an edge-list file (source, target) with toggle between Pandas and Spark.
+    
     Parameters
     ----------
     filepath : str
         Path to the edge-list text/CSV file.
+    engine : str
+        "pandas" (default, chunked) or "spark" (distributed load + limit).
     chunksize : int
-        Number of rows to read per chunk (default 100k).
+        Pandas: rows per chunk (default 100k).
     max_rows : int | None
-        If set, stop loading after this many rows (partial load).
+        Max rows to load (Pandas partial; Spark limit).
     sep : str
-        Column separator in the file.
+        Column separator.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with columns ['source', 'target'] using uint32 dtypes
-        to minimise memory usage.
+        Cleaned DataFrame with ['source', 'target'] (int32).
     """
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Dataset not found at: {filepath}")
 
-    chunks = []
-    total_loaded = 0
+    if engine == "spark":
+        logger.info(f"Loading with Spark: {filepath} (limit={max_rows or 500000}, sep='{sep}')")
+        spark = SparkSession.builder \
+            .appName("FakeAccountGraphLoader") \
+            .getOrCreate()
 
-    logger.info(f"Loading dataset from {filepath} (chunksize={chunksize}, max_rows={max_rows})")
+        schema = StructType([
+            StructField("source", IntegerType(), True),
+            StructField("target", IntegerType(), True)
+        ])
 
-    try:
-        reader = pd.read_csv(
-            filepath,
-            sep=sep,
-            names=["source", "target"],
-            dtype={"source": "int32", "target": "int32"},
-            comment="#",          # skip comment lines
-            on_bad_lines="skip",  # skip malformed rows
-            chunksize=chunksize,
-            engine="c",           # fastest pandas engine
-        )
+        df_spark = spark.read \
+            .option("sep", sep) \
+            .option("header", "false") \
+            .option("comment", "#") \
+            .option("mode", "DROPMALFORMED") \
+            .csv(filepath, schema=schema)
 
-        for chunk in reader:
-            # Drop self-loops & nulls
-            chunk = chunk.dropna()
-            chunk = chunk[chunk["source"] != chunk["target"]]
-            chunks.append(chunk)
-            total_loaded += len(chunk)
-            logger.debug(f"  Loaded chunk: {len(chunk)} rows (total so far: {total_loaded})")
+        limit = max_rows or 500000
+        df_spark = df_spark.limit(limit).cache()
 
-            if max_rows and total_loaded >= max_rows:
-                logger.info(f"Partial load limit reached ({max_rows} rows).")
-                break
+        df = df_spark.toPandas()
 
-    except Exception as e:
-        logger.error(f"Error reading dataset: {e}")
-        raise
+        df_spark.unpersist()
+        spark.stop()
+        
+    else:  # pandas
+        logger.info(f"Loading with Pandas: {filepath} (chunksize={chunksize}, max_rows={max_rows})")
+        chunks = []
+        total_loaded = 0
 
-    if not chunks:
-        raise ValueError("No valid data loaded from dataset.")
+        try:
+            reader = pd.read_csv(
+                filepath,
+                sep=sep,
+                names=["source", "target"],
+                dtype={"source": "int32", "target": "int32"},
+                comment="#",
+                on_bad_lines="skip",
+                chunksize=chunksize,
+                engine="c",
+            )
 
-    df = pd.concat(chunks, ignore_index=True)
+            for chunk in reader:
+                chunk = chunk.dropna()
+                chunk = chunk[chunk["source"] != chunk["target"]]
+                chunks.append(chunk)
+                total_loaded += len(chunk)
+                logger.debug(f"  Loaded chunk: {len(chunk)} rows (total: {total_loaded})")
 
-    # Trim to exact max_rows if needed
-    if max_rows and len(df) > max_rows:
-        df = df.iloc[:max_rows]
+                if max_rows and total_loaded >= max_rows:
+                    logger.info(f"Partial load reached ({max_rows} rows).")
+                    break
 
-    logger.info(f"Dataset loaded: {len(df):,} edges, memory ≈ {df.memory_usage(deep=True).sum() / 1e6:.1f} MB")
+        except Exception as e:
+            logger.error(f"Pandas error: {e}")
+            raise
+
+        if not chunks:
+            raise ValueError("No valid data loaded.")
+
+        df = pd.concat(chunks, ignore_index=True)
+        if max_rows and len(df) > max_rows:
+            df = df.iloc[:max_rows]
+
+    # Common post-processing
+    df = df.dropna()
+    df = df[df["source"] != df["target"]]
+    df["source"] = df["source"].astype("int32")
+    df["target"] = df["target"].astype("int32")
+
+    logger.info(f"Dataset loaded ({engine}): {len(df):,} edges, memory ≈ {df.memory_usage(deep=True).sum() / 1e6:.1f} MB")
     return df
 
 

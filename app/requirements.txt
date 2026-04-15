@@ -5,3 +5,4 @@ scikit-learn>=1.4.0
 numpy>=1.26.0
 pyvis>=0.3.2
 gunicorn>=22.0.0
+pyspark>=3.5.0

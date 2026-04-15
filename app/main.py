@@ -46,6 +46,7 @@ app = Flask(__name__)
 
 DATASET_PATH  = os.environ.get("DATASET_PATH", "/data/twitter_combined.txt")
 DATASET_SEP   = os.environ.get("DATASET_SEP",  " ")
+LOAD_ENGINE   = os.environ.get("LOAD_ENGINE", "pandas")
 MAX_ROWS      = int(os.environ.get("MAX_ROWS",  "500000"))   # partial load cap
 TOP_N         = int(os.environ.get("TOP_N",     "5000"))     # nodes to analyze
 CHUNKSIZE     = int(os.environ.get("CHUNKSIZE", "100000"))
@@ -66,7 +67,7 @@ def _get_or_build_graph():
     G = cache.get_cache(CACHE_GRAPH)
     if G is None:
         logger.info("Graph cache miss — loading dataset and building graph...")
-        df_edges = load_edgelist(DATASET_PATH, chunksize=CHUNKSIZE, max_rows=MAX_ROWS, sep=DATASET_SEP)
+        df_edges = load_edgelist(DATASET_PATH, engine=LOAD_ENGINE, chunksize=CHUNKSIZE, max_rows=MAX_ROWS, sep=DATASET_SEP)
         G = build_graph(df_edges)
         cache.set_cache(CACHE_GRAPH, G, ttl=3600)
     return G
