@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fake Account Detection</title>
+    <!-- Modern Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;700&display=swap" rel="stylesheet">
+    <!-- Local CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Phosphor Icons (lightweight icon set) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+</head>
+<body>
+
+    <div class="layout">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="ph ph-detective"></i>
+                <h2>Sentinel<span class="accent">OS</span></h2>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="dashboard-tab">
+                    <i class="ph ph-squares-four"></i> Dashboard
+                </button>
+                <button class="nav-item" data-tab="analyze-tab">
+                    <i class="ph ph-chart-line-up"></i> Analyze View
+                </button>
+                <button class="nav-item" data-tab="fake-users-tab">
+                    <i class="ph ph-users-three"></i> Fake Users
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <div class="pulse"></div>
+                    <span>API Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="content">
+            
+            <header class="topbar">
+                <h1 id="page-title">Network Dashboard</h1>
+                <div class="actions">
+                    <a href="/visualize" target="_blank" class="btn btn-primary">
+                        <i class="ph ph-graph"></i> Open 3D Map
+                    </a>
+                </div>
+            </header>
+
+            <div class="tab-container">
+
+                <!-- DASHBOARD TAB -->
+                <div id="dashboard-tab" class="tab-pane active">
+                    <div id="dashboard-loader" class="loader">Fetching data...</div>
+                    <div id="dashboard-content" class="hidden">
+                        
+                        <div class="grid-cards">
+                            <div class="glass-card kpi">
+                                <i class="ph ph-chart-pie-slice kpi-icon text-accent"></i>
+                                <h3>Analyzed Nodes</h3>
+                                <div class="value" id="kpi-total-nodes">-</div>
+                                <div class="subtitle" id="kpi-total-edges">- edges loaded</div>
+                            </div>
+                            <div class="glass-card kpi">
+                                <i class="ph ph-user-focus kpi-icon text-green"></i>
+                                <h3>Real Accounts</h3>
+                                <div class="value text-green" id="kpi-real-nodes">-</div>
+                                <div class="subtitle">Trusted Profiles</div>
+                            </div>
+                            <div class="glass-card kpi">
+                                <i class="ph ph-robot kpi-icon text-red"></i>
+                                <h3>Fake Bots</h3>
+                                <div class="value text-red" id="kpi-fake-nodes">-</div>
+                                <div class="subtitle" id="kpi-fake-percentage">-</div>
+                            </div>
+                        </div>
+
+                        <!-- Statistics specific to Fakes -->
+                        <div class="glass-card mt-2">
+                            <h2>Averages Comparison (Real vs Fake)</h2>
+                            <div class="comparison-grid mt-1">
+                                <div class="comp-box">
+                                    <div class="label">Avg PageRank (Real)</div>
+                                    <div class="val text-green" id="pr-real">-</div>
+                                </div>
+                                <div class="comp-box">
+                                    <div class="label">Avg PageRank (Fake)</div>
+                                    <div class="val text-red" id="pr-fake">-</div>
+                                </div>
+                                <div class="comp-box">
+                                    <div class="label">Clustering (Real)</div>
+                                    <div class="val text-green" id="clus-real">-</div>
+                                </div>
+                                <div class="comp-box">
+                                    <div class="label">Clustering (Fake)</div>
+                                    <div class="val text-red" id="clus-fake">-</div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- ANALYZE TAB -->
+                <div id="analyze-tab" class="tab-pane">
+                    <div id="analyze-loader" class="loader">Running ML Pipeline...</div>
+                    <div id="analyze-content" class="hidden">
+                        <div class="glass-card">
+                            <h2><i class="ph ph-cpu"></i> ML Evaluation Metrics</h2>
+                            <p class="text-muted mt-1">Performance of the Random Forest model (trained on suspicious rule heuristic targets).</p>
+                            
+                            <div class="metrics-row mt-2" id="ml-metrics-container">
+                                <!-- Populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAKE USERS TAB -->
+                <div id="fake-users-tab" class="tab-pane">
+                    <div class="glass-card">
+                        <div class="flex-between">
+                            <h2>Flagged Botnets</h2>
+                            <div class="pagination">
+                                <button id="btn-prev" class="btn btn-secondary">Prev</button>
+                                <span id="page-indicator">Page 1 / -</span>
+                                <button id="btn-next" class="btn btn-secondary">Next</button>
+                            </div>
+                        </div>
+                        
+                        <div class="table-responsive mt-2">
+                            <table class="modern-table">
+                                <thead>
+                                    <tr>
+                                        <th>Node ID</th>
+                                        <th>Out Degree</th>
+                                        <th>In Degree</th>
+                                        <th>ML Probability</th>
+                                        <th>Explainability Reason</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="fake-users-tbody">
+                                    <tr><td colspan="5" class="text-center loader-row">Loading users...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Local JS -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

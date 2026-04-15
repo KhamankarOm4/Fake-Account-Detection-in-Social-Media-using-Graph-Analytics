@@ -1,0 +1,52 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# docker-compose.yml — Fake Account Detection API
+# ──────────────────────────────────────────────────────────────────────────────
+version: "3.9"
+
+services:
+  fake-detection:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fake_account_detection_api
+    image: fake-account-detection:latest
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"
+
+    # Mount dataset directory — place twitter_combined.txt in ./data/
+    volumes:
+      - ./data:/data:ro    # read-only mount for data safety
+
+    # Environment variables (override as needed)
+    environment:
+      DATASET_PATH: /data/synthetic_1m.txt
+      DATASET_SEP: " "
+      MAX_ROWS: "1000000"       # set to 0 for no limit (load all)
+      TOP_N: "5000"            # top N nodes to analyse
+      CHUNKSIZE: "100000"      # pandas read chunk size
+      PORT: "5000"
+      FLASK_DEBUG: "false"
+
+    # Resource limits to prevent runaway memory usage on large datasets
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+          cpus: "2.0"
+        reservations:
+          memory: 512M
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s    # give extra time for initial graph load
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
